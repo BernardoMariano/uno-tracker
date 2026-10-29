@@ -70,16 +70,16 @@ type Played = Record<ColorId, number>;
 const NONE_PLAYED: Played = { green: 0, red: 0, yellow: 0, blue: 0 };
 
 // UNO! mobile has no fixed deck, so counts can't be subtracted from a known
-// total. Instead, colors played more often are taken as more likely in hand:
-// each color's share of (times played + 1) among the colors the opponent isn't
-// known to be out of. The +1 starts every color even at 25%. null when the
-// opponent is out of every color.
+// total. Instead, the more a color is played the less likely it's still in
+// hand: each color weighs 1 / (times played + 1), and its chance is its share
+// of the weights of the colors the opponent isn't known to be out of. Every
+// color starts even at 25%. null when the opponent is out of every color.
 function handOdds(
   opponent: Opponent,
   played: Played,
 ): Record<ColorId, number | null> {
   const weight = (id: ColorId) =>
-    opponent.missing.includes(id) ? 0 : played[id] + 1;
+    opponent.missing.includes(id) ? 0 : 1 / (played[id] + 1);
   const total = COLORS.reduce((sum, color) => sum + weight(color.id), 0);
   const odds = (id: ColorId) => (total === 0 ? null : weight(id) / total);
 
@@ -357,7 +357,7 @@ export default function UnoTracker() {
           Tap a color in{" "}
           <span className="font-semibold text-amber-400">Played Cards</span>{" "}
           every time one is played (− undoes). Each opponent card estimates how
-          likely they hold that color: the more a color is played, the higher
+          likely they still hold that color: the more a color is played, the lower
           it goes.
         </div>
       </footer>
