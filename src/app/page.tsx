@@ -13,9 +13,6 @@ type Opponent = {
   preferred: ColorId | null;
 };
 
-// A standard deck has 25 cards of each color (plus 8 Wilds).
-const CARDS_PER_COLOR = 25;
-
 // Full class strings so Tailwind can detect them at build time.
 const COLORS: {
   id: ColorId;
@@ -72,19 +69,19 @@ type Played = Record<ColorId, number>;
 
 const NONE_PLAYED: Played = { green: 0, red: 0, yellow: 0, blue: 0 };
 
-// Chance that a colored card in the opponent's hand is each color: the share of
-// unseen cards of that color among the colors they aren't known to be out of.
-// null when nothing is left to split.
+// UNO! mobile has no fixed deck, so counts can't be subtracted from a known
+// total. Instead, colors played more often are taken as more likely in hand:
+// each color's share of (times played + 1) among the colors the opponent isn't
+// known to be out of. The +1 starts every color even at 25%. null when the
+// opponent is out of every color.
 function handOdds(
   opponent: Opponent,
   played: Played,
 ): Record<ColorId, number | null> {
-  const unseen = (id: ColorId) =>
-    opponent.missing.includes(id)
-      ? 0
-      : Math.max(0, CARDS_PER_COLOR - played[id]);
-  const total = COLORS.reduce((sum, color) => sum + unseen(color.id), 0);
-  const odds = (id: ColorId) => (total === 0 ? null : unseen(id) / total);
+  const weight = (id: ColorId) =>
+    opponent.missing.includes(id) ? 0 : played[id] + 1;
+  const total = COLORS.reduce((sum, color) => sum + weight(color.id), 0);
+  const odds = (id: ColorId) => (total === 0 ? null : weight(id) / total);
 
   return {
     green: odds("green"),
@@ -229,13 +226,12 @@ function PlayedCounter({
               <button
                 type="button"
                 onClick={() => onChange(color.id, 1)}
-                disabled={count >= CARDS_PER_COLOR}
                 aria-label={`Count a played ${color.id} card (${count} played)`}
-                className={`flex h-12 w-14 flex-col items-center justify-center rounded-lg shadow-md transition-all duration-150 select-none hover:-translate-y-0.5 active:scale-95 disabled:opacity-40 md:w-16 ${color.card} ${color.ink}`}
+                className={`flex h-12 w-14 flex-col items-center justify-center rounded-lg shadow-md transition-all duration-150 select-none hover:-translate-y-0.5 active:scale-95 md:w-16 ${color.card} ${color.ink}`}
               >
                 <span className="text-lg leading-none font-black">{count}</span>
                 <span className="text-[9px] font-semibold uppercase opacity-80">
-                  {CARDS_PER_COLOR - count} left
+                  played
                 </span>
               </button>
               <button
@@ -262,7 +258,7 @@ export default function UnoTracker() {
   const changePlayed = (color: ColorId, delta: number) => {
     setPlayed((prev) => ({
       ...prev,
-      [color]: Math.min(CARDS_PER_COLOR, Math.max(0, prev[color] + delta)),
+      [color]: Math.max(0, prev[color] + delta),
     }));
   };
 
@@ -360,8 +356,9 @@ export default function UnoTracker() {
         <div>
           Tap a color in{" "}
           <span className="font-semibold text-amber-400">Played Cards</span>{" "}
-          every time one is played (− undoes). Each opponent card shows the
-          chance a card in their hand is that color.
+          every time one is played (− undoes). Each opponent card estimates how
+          likely they hold that color: the more a color is played, the higher
+          it goes.
         </div>
       </footer>
     </div>
