@@ -13,16 +13,22 @@ type Opponent = {
   preferred: ColorId | null;
 };
 
+// A standard deck has 25 cards of each color (plus 8 Wilds).
+const CARDS_PER_COLOR = 25;
+
 // Full class strings so Tailwind can detect them at build time.
 const COLORS: {
   id: ColorId;
   card: string;
+  // Readable text on top of `card`.
+  ink: string;
   text: string;
   preferred: string;
 }[] = [
   {
     id: "green",
     card: "bg-[#379711]",
+    ink: "text-white",
     text: "text-[#379711]",
     preferred:
       "bg-[#379711]/20 text-[#379711] border-[#379711]/60 shadow-lg shadow-[#379711]/10",
@@ -30,6 +36,7 @@ const COLORS: {
   {
     id: "red",
     card: "bg-[#D72600]",
+    ink: "text-white",
     text: "text-[#D72600]",
     preferred:
       "bg-[#D72600]/20 text-[#D72600] border-[#D72600]/60 shadow-lg shadow-[#D72600]/10",
@@ -37,6 +44,7 @@ const COLORS: {
   {
     id: "yellow",
     card: "bg-[#ECD407]",
+    ink: "text-slate-900",
     text: "text-[#ECD407]",
     preferred:
       "bg-[#ECD407]/20 text-[#ECD407] border-[#ECD407]/60 shadow-lg shadow-[#ECD407]/10",
@@ -44,6 +52,7 @@ const COLORS: {
   {
     id: "blue",
     card: "bg-[#0956BF]",
+    ink: "text-white",
     text: "text-[#0956BF]",
     preferred:
       "bg-[#0956BF]/20 text-[#0956BF] border-[#0956BF]/60 shadow-lg shadow-[#0956BF]/10",
@@ -58,6 +67,32 @@ const INITIAL_STATE: Record<Position, Opponent> = {
   top: { name: "Opponent (Top)", missing: [], preferred: null },
   right: { name: "Opponent (Right)", missing: [], preferred: null },
 };
+
+type Played = Record<ColorId, number>;
+
+const NONE_PLAYED: Played = { green: 0, red: 0, yellow: 0, blue: 0 };
+
+// Chance that a colored card in the opponent's hand is each color: the share of
+// unseen cards of that color among the colors they aren't known to be out of.
+// null when nothing is left to split.
+function handOdds(
+  opponent: Opponent,
+  played: Played,
+): Record<ColorId, number | null> {
+  const unseen = (id: ColorId) =>
+    opponent.missing.includes(id)
+      ? 0
+      : Math.max(0, CARDS_PER_COLOR - played[id]);
+  const total = COLORS.reduce((sum, color) => sum + unseen(color.id), 0);
+  const odds = (id: ColorId) => (total === 0 ? null : unseen(id) / total);
+
+  return {
+    green: odds("green"),
+    red: odds("red"),
+    yellow: odds("yellow"),
+    blue: odds("blue"),
+  };
+}
 
 const UPRIGHT = {
   set: "flex-row",
@@ -91,11 +126,13 @@ const LAYOUTS: Record<Position, typeof UPRIGHT> = {
 
 function CardSet({
   opponent,
+  odds,
   layout,
   onToggleCard,
   onTogglePreference,
 }: {
   opponent: Opponent;
+  odds: Record<ColorId, number | null>;
   layout: typeof UPRIGHT;
   onToggleCard: (color: ColorId) => void;
   onTogglePreference: (color: ColorId) => void;
@@ -111,6 +148,7 @@ function CardSet({
         {COLORS.map((color) => {
           const active = !opponent.missing.includes(color.id);
           const preferred = opponent.preferred === color.id;
+          const chance = odds[color.id];
 
           return (
             <div key={color.id} className={`flex gap-2 ${layout.item}`}>
@@ -132,8 +170,10 @@ function CardSet({
               >
                 {active ? (
                   <div
-                    className={`rounded border border-white/20 shadow-inner ${layout.inner}`}
-                  />
+                    className={`flex items-center justify-center rounded border border-white/20 text-sm font-bold shadow-inner md:text-base ${color.ink} ${layout.inner}`}
+                  >
+                    {chance === null ? "–" : `${Math.round(chance * 100)}%`}
+                  </div>
                 ) : (
                   <span
                     className={`${color.text} animate-scale-in text-3xl font-bold`}
@@ -168,8 +208,68 @@ function CardSet({
   );
 }
 
+function PlayedCounter({
+  played,
+  onChange,
+}: {
+  played: Played;
+  onChange: (color: ColorId, delta: number) => void;
+}) {
+  return (
+    <div className="z-10 flex flex-col items-center gap-2">
+      <span className="rounded bg-slate-800/80 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider whitespace-nowrap text-slate-400 shadow">
+        Played Cards
+      </span>
+      <div className="flex gap-3 rounded-xl border border-slate-700/30 bg-slate-900/40 p-2 shadow-lg backdrop-blur-sm">
+        {COLORS.map((color) => {
+          const count = played[color.id];
+
+          return (
+            <div key={color.id} className="flex flex-col items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onChange(color.id, 1)}
+                disabled={count >= CARDS_PER_COLOR}
+                aria-label={`Count a played ${color.id} card (${count} played)`}
+                className={`flex h-12 w-14 flex-col items-center justify-center rounded-lg shadow-md transition-all duration-150 select-none hover:-translate-y-0.5 active:scale-95 disabled:opacity-40 md:w-16 ${color.card} ${color.ink}`}
+              >
+                <span className="text-lg leading-none font-black">{count}</span>
+                <span className="text-[9px] font-semibold uppercase opacity-80">
+                  {CARDS_PER_COLOR - count} left
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange(color.id, -1)}
+                disabled={count === 0}
+                aria-label={`Undo a played ${color.id} card`}
+                className="w-full rounded border border-slate-800 bg-slate-950/40 text-sm leading-5 font-bold text-slate-400 transition-all duration-150 hover:border-slate-700 hover:text-slate-300 disabled:opacity-30"
+              >
+                −
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function UnoTracker() {
   const [opponents, setOpponents] = useState(INITIAL_STATE);
+  const [played, setPlayed] = useState(NONE_PLAYED);
+
+  const changePlayed = (color: ColorId, delta: number) => {
+    setPlayed((prev) => ({
+      ...prev,
+      [color]: Math.min(CARDS_PER_COLOR, Math.max(0, prev[color] + delta)),
+    }));
+  };
+
+  const resetGame = () => {
+    setOpponents(INITIAL_STATE);
+    setPlayed(NONE_PLAYED);
+  };
 
   const updateOpponent = (
     position: Position,
@@ -197,6 +297,7 @@ export default function UnoTracker() {
   const cardSet = (position: Position) => (
     <CardSet
       opponent={opponents[position]}
+      odds={handOdds(opponents[position], played)}
       layout={LAYOUTS[position]}
       onToggleCard={(color) => toggleCard(position, color)}
       onTogglePreference={(color) => togglePreference(position, color)}
@@ -211,7 +312,7 @@ export default function UnoTracker() {
         </h1>
         <button
           type="button"
-          onClick={() => setOpponents(INITIAL_STATE)}
+          onClick={resetGame}
           className="rounded-lg bg-rose-600 px-4 py-1.5 text-xs font-medium text-white shadow-md transition-all duration-150 hover:bg-rose-500 active:bg-rose-700 md:text-sm"
         >
           Reset Game
@@ -239,10 +340,9 @@ export default function UnoTracker() {
           {cardSet("right")}
         </div>
 
-        <div className="col-span-2 justify-self-center opacity-40 md:absolute md:bottom-4 md:left-1/2 md:-translate-x-1/2">
-          <span className="rounded-full border border-slate-800 bg-slate-900/50 px-4 py-1 text-xs font-bold uppercase tracking-widest text-slate-500">
-            Your View
-          </span>
+        {/* Your seat: count every colored card played to the pile. */}
+        <div className="col-span-2 justify-self-center md:absolute md:bottom-4 md:left-1/2 md:-translate-x-1/2">
+          <PlayedCounter played={played} onChange={changePlayed} />
         </div>
       </main>
 
@@ -256,6 +356,12 @@ export default function UnoTracker() {
           Toggle the <span className="font-semibold text-amber-400">★ Fav</span>{" "}
           button next to a card to mark their declared Wild preference (only one
           active per opponent).
+        </div>
+        <div>
+          Tap a color in{" "}
+          <span className="font-semibold text-amber-400">Played Cards</span>{" "}
+          every time one is played (− undoes). Each opponent card shows the
+          chance a card in their hand is that color.
         </div>
       </footer>
     </div>
