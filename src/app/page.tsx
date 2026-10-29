@@ -181,26 +181,27 @@ export default function UnoTracker() {
         </button>
       </header>
 
-      <main className="relative my-auto flex aspect-[4/3] max-h-[70vh] w-full max-w-4xl items-center justify-center">
-        <div className="absolute flex h-2/5 w-3/5 items-center justify-center rounded-[50%] border-4 border-slate-800/80 bg-gradient-to-b from-slate-900/60 to-slate-950/80 shadow-2xl">
-          <div className="text-center text-xs font-semibold uppercase tracking-widest opacity-25 md:text-sm">
+      {/* Phones stack opponents in play order; wider screens seat them around the table. */}
+      <main className="my-auto flex w-full max-w-4xl flex-col items-center gap-6 py-6 md:relative md:aspect-[4/3] md:max-h-[70vh] md:justify-center md:py-0">
+        <div className="absolute hidden h-2/5 w-3/5 items-center justify-center rounded-[50%] border-4 border-slate-800/80 bg-gradient-to-b from-slate-900/60 to-slate-950/80 shadow-2xl md:flex">
+          <div className="text-center text-sm font-semibold uppercase tracking-widest opacity-25">
             Game Table
           </div>
         </div>
 
-        <div className="absolute top-4 left-1/2 -translate-x-1/2">
-          {cardSet("top")}
-        </div>
-
-        <div className="absolute top-1/2 left-2 -translate-y-1/2 md:left-4">
+        <div className="md:absolute md:top-1/2 md:left-4 md:-translate-y-1/2">
           {cardSet("left")}
         </div>
 
-        <div className="absolute top-1/2 right-2 -translate-y-1/2 md:right-4">
+        <div className="md:absolute md:top-4 md:left-1/2 md:-translate-x-1/2">
+          {cardSet("top")}
+        </div>
+
+        <div className="md:absolute md:top-1/2 md:right-4 md:-translate-y-1/2">
           {cardSet("right")}
         </div>
 
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 opacity-40">
+        <div className="opacity-40 md:absolute md:bottom-4 md:left-1/2 md:-translate-x-1/2">
           <span className="rounded-full border border-slate-800 bg-slate-900/50 px-4 py-1 text-xs font-bold uppercase tracking-widest text-slate-500">
             Your View
           </span>
