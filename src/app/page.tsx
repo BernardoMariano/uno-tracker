@@ -59,27 +59,61 @@ const INITIAL_STATE: Record<Position, Opponent> = {
   right: { name: "Opponent (Right)", missing: [], preferred: null },
 };
 
+const UPRIGHT = {
+  set: "flex-row",
+  item: "flex-col items-center",
+  card: "h-20 w-14 md:h-24 md:w-16",
+  inner: "h-16 w-10 md:h-20 md:w-12",
+  fav: "w-full py-0.5",
+};
+
+// Below md the side hands lie sideways (left turned 90°, right -90°) as columns
+// of landscape cards, so labels and marks stay upright; md+ shows every hand upright.
+const SIDEWAYS = {
+  card: "h-14 w-20 md:h-24 md:w-16",
+  inner: "h-10 w-16 md:h-20 md:w-12",
+  fav: "self-stretch px-1 md:self-auto md:w-full md:py-0.5",
+};
+
+const LAYOUTS: Record<Position, typeof UPRIGHT> = {
+  top: UPRIGHT,
+  left: {
+    ...SIDEWAYS,
+    set: "flex-col md:flex-row",
+    item: "flex-row-reverse items-stretch md:flex-col md:items-center",
+  },
+  right: {
+    ...SIDEWAYS,
+    set: "flex-col-reverse md:flex-row",
+    item: "flex-row items-stretch md:flex-col md:items-center",
+  },
+};
+
 function CardSet({
   opponent,
+  layout,
   onToggleCard,
   onTogglePreference,
 }: {
   opponent: Opponent;
+  layout: typeof UPRIGHT;
   onToggleCard: (color: ColorId) => void;
   onTogglePreference: (color: ColorId) => void;
 }) {
   return (
     <div className="z-10 flex flex-col items-center gap-2">
-      <span className="rounded bg-slate-800/80 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-slate-400 shadow">
+      <span className="rounded bg-slate-800/80 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider whitespace-nowrap text-slate-400 shadow">
         {opponent.name}
       </span>
-      <div className="flex gap-3 rounded-xl border border-slate-700/30 bg-slate-900/40 p-2 shadow-lg backdrop-blur-sm">
+      <div
+        className={`flex gap-3 rounded-xl border border-slate-700/30 bg-slate-900/40 p-2 shadow-lg backdrop-blur-sm ${layout.set}`}
+      >
         {COLORS.map((color) => {
           const active = !opponent.missing.includes(color.id);
           const preferred = opponent.preferred === color.id;
 
           return (
-            <div key={color.id} className="flex flex-col items-center gap-2">
+            <div key={color.id} className={`flex gap-2 ${layout.item}`}>
               <button
                 type="button"
                 onClick={() => onToggleCard(color.id)}
@@ -90,14 +124,16 @@ function CardSet({
                 title={
                   active ? `Mark ${color.id} as missing` : `Restore ${color.id}`
                 }
-                className={`relative flex h-20 w-14 items-center justify-center rounded-lg text-2xl font-black transition-all duration-300 select-none md:h-24 md:w-16 ${
+                className={`relative flex items-center justify-center rounded-lg text-2xl font-black transition-all duration-300 select-none ${layout.card} ${
                   active
                     ? `${color.card} text-white shadow-md hover:-translate-y-1 hover:shadow-xl active:scale-95`
                     : "border-2 border-dashed border-slate-500 bg-slate-800 shadow-inner"
                 }`}
               >
                 {active ? (
-                  <div className="h-16 w-10 rounded border border-white/20 shadow-inner md:h-20 md:w-12" />
+                  <div
+                    className={`rounded border border-white/20 shadow-inner ${layout.inner}`}
+                  />
                 ) : (
                   <span
                     className={`${color.text} animate-scale-in text-3xl font-bold`}
@@ -117,7 +153,7 @@ function CardSet({
                     ? "Opponent selected this with a Wild (AVOID!)"
                     : `Mark ${color.id} as Wild preference`
                 }
-                className={`flex w-full items-center justify-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider transition-all duration-200 ${
+                className={`flex items-center justify-center gap-1 rounded border px-1.5 text-[10px] font-extrabold uppercase tracking-wider transition-all duration-200 ${layout.fav} ${
                   preferred ? color.preferred : NOT_PREFERRED
                 }`}
               >
@@ -161,6 +197,7 @@ export default function UnoTracker() {
   const cardSet = (position: Position) => (
     <CardSet
       opponent={opponents[position]}
+      layout={LAYOUTS[position]}
       onToggleCard={(color) => toggleCard(position, color)}
       onTogglePreference={(color) => togglePreference(position, color)}
     />
@@ -181,27 +218,28 @@ export default function UnoTracker() {
         </button>
       </header>
 
-      {/* Phones stack opponents in play order; wider screens seat them around the table. */}
-      <main className="my-auto flex w-full max-w-4xl flex-col items-center gap-6 py-6 md:relative md:aspect-[4/3] md:max-h-[70vh] md:justify-center md:py-0">
+      {/* Phones put the top hand first with the sideways side hands below it at
+          the screen edges; wider screens seat everyone around the table. */}
+      <main className="my-auto grid w-full max-w-4xl grid-cols-2 gap-x-2 gap-y-6 py-6 md:relative md:flex md:aspect-[4/3] md:max-h-[70vh] md:items-center md:justify-center md:py-0">
         <div className="absolute hidden h-2/5 w-3/5 items-center justify-center rounded-[50%] border-4 border-slate-800/80 bg-gradient-to-b from-slate-900/60 to-slate-950/80 shadow-2xl md:flex">
           <div className="text-center text-sm font-semibold uppercase tracking-widest opacity-25">
             Game Table
           </div>
         </div>
 
-        <div className="md:absolute md:top-1/2 md:left-4 md:-translate-y-1/2">
-          {cardSet("left")}
-        </div>
-
-        <div className="md:absolute md:top-4 md:left-1/2 md:-translate-x-1/2">
+        <div className="col-span-2 justify-self-center md:absolute md:top-4 md:left-1/2 md:-translate-x-1/2">
           {cardSet("top")}
         </div>
 
-        <div className="md:absolute md:top-1/2 md:right-4 md:-translate-y-1/2">
+        <div className="justify-self-start md:absolute md:top-1/2 md:left-4 md:-translate-y-1/2">
+          {cardSet("left")}
+        </div>
+
+        <div className="justify-self-end md:absolute md:top-1/2 md:right-4 md:-translate-y-1/2">
           {cardSet("right")}
         </div>
 
-        <div className="opacity-40 md:absolute md:bottom-4 md:left-1/2 md:-translate-x-1/2">
+        <div className="col-span-2 justify-self-center opacity-40 md:absolute md:bottom-4 md:left-1/2 md:-translate-x-1/2">
           <span className="rounded-full border border-slate-800 bg-slate-900/50 px-4 py-1 text-xs font-bold uppercase tracking-widest text-slate-500">
             Your View
           </span>
@@ -216,7 +254,7 @@ export default function UnoTracker() {
         </div>
         <div>
           Toggle the <span className="font-semibold text-amber-400">★ Fav</span>{" "}
-          button below a card to mark their declared Wild preference (only one
+          button next to a card to mark their declared Wild preference (only one
           active per opponent).
         </div>
       </footer>
