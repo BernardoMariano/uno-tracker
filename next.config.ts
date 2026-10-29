@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Static export for GitHub Pages; the deploy workflow sets the base path.
+  output: "export",
+  basePath: process.env.PAGES_BASE_PATH,
+  images: { unoptimized: true },
   turbopack: {
     rules: {
       "*.css": {
